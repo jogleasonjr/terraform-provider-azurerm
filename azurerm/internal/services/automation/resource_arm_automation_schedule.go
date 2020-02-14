@@ -49,23 +49,12 @@ func resourceArmAutomationSchedule() *schema.Resource {
 
 			"resource_group_name": azure.SchemaResourceGroupName(),
 
-			//this is AutomationAccountName in the SDK
-			"account_name": {
-				Type:          schema.TypeString,
-				Optional:      true,
-				Computed:      true,
-				Deprecated:    "account_name has been renamed to automation_account_name for clarity and to match the azure API",
-				ConflictsWith: []string{"automation_account_name"},
-				ValidateFunc:  azure.ValidateAutomationAccountName(),
-			},
-
 			"automation_account_name": {
-				Type:     schema.TypeString,
-				Optional: true, //todo change to required once account_name has been removed
-				Computed: true,
-				//ForceNew:      true, //todo this needs to come back once account_name has been removed
-				ConflictsWith: []string{"account_name"},
-				ValidateFunc:  azure.ValidateAutomationAccountName(),
+				Type:         schema.TypeString,
+				Required:     true,
+				Computed:     true,
+				ForceNew:     true,
+				ValidateFunc: azure.ValidateAutomationAccountName(),
 			},
 
 			"frequency": {
@@ -112,10 +101,10 @@ func resourceArmAutomationSchedule() *schema.Resource {
 			},
 
 			"timezone": {
-				Type:     schema.TypeString,
-				Optional: true,
-				Default:  "UTC",
-				//todo figure out how to validate this properly
+				Type:         schema.TypeString,
+				Optional:     true,
+				Default:      "UTC",
+				ValidateFunc: validate.AzureTimeZoneString(),
 			},
 
 			"week_days": {
@@ -239,13 +228,7 @@ func resourceArmAutomationScheduleCreateUpdate(d *schema.ResourceData, meta inte
 	name := d.Get("name").(string)
 	resGroup := d.Get("resource_group_name").(string)
 	//CustomizeDiff should ensure one of these two is set
-	// todo remove this once `account_name` is removed
-	accountName := ""
-	if v, ok := d.GetOk("automation_account_name"); ok {
-		accountName = v.(string)
-	} else if v, ok := d.GetOk("account_name"); ok {
-		accountName = v.(string)
-	}
+	accountName := d.Get("automation_account_name").(string)
 
 	if features.ShouldResourcesBeImported() && d.IsNewResource() {
 		existing, err := client.Get(ctx, resGroup, accountName, name)
@@ -350,7 +333,6 @@ func resourceArmAutomationScheduleRead(d *schema.ResourceData, meta interface{})
 	d.Set("name", resp.Name)
 	d.Set("resource_group_name", resGroup)
 	d.Set("automation_account_name", accountName)
-	d.Set("account_name", accountName) // todo remove once `account_name` is removed
 	d.Set("frequency", string(resp.Frequency))
 
 	if v := resp.StartTime; v != nil {
